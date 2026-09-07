@@ -307,4 +307,10 @@ Linkedin: [https://www.linkedin.com/in/jibran-anjum-chughtai-905a47256/](https:/
 
 ## Project Information
 
-**Program Name:** Cybersecurity at Networkwalks | **Week:** 01 | **Project:** Cybersecurity & Pentesting Lab Setup | **Repository:** GitHub
+**Program Name:** Cybersecurity at Networkwalks
+
+**Week:** 01
+
+**Project:** Cybersecurity & Pentesting Lab Setup
+
+**Repository:** GitHub
