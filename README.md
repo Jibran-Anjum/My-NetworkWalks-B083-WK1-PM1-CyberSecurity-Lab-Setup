@@ -115,6 +115,8 @@ I created a NAT network that was created in VirtualBox.
 
 **Configuration:**
 
+| Name         | Setup         |
+|--------------|---------------|
 | NetworkName: | NatNetwork    |
 | IPv4 Prefix: | 10.30.30.0/24 |
 | DHCP:        | Enabled       |
