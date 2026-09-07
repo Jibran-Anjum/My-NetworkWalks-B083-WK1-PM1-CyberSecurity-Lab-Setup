@@ -115,7 +115,7 @@ I created a NAT network that was created in VirtualBox.
 
 **Configuration:**
 
-| Name         | Setup         |
+| Name         | Value         |
 |--------------|---------------|
 | NetworkName: | NatNetwork    |
 | IPv4 Prefix: | 10.30.30.0/24 |
@@ -136,6 +136,8 @@ The Kali Linux virtual machine was downloaded from the official Kali Linux websi
 
 The VM network adapter was configured as follows;
 
+| Name         | Value                               |
+|--------------|-------------------------------------|
 | Adapter      | 1                                   |
 | Attached to  | NAT Network                         |
 | Network      | NATNetwork                          |
@@ -143,7 +145,7 @@ The VM network adapter was configured as follows;
 
 The VM was allocated;
 
-| RAM | 2048MB |
+**RAM:** 2048MB
 
 ![](./KaliLinux.png)
 
@@ -155,6 +157,8 @@ The Kali Linux network configuration was checked and configured with a consisten
 
 The configuration;
 
+| Name        | Value         |
+|-------------|---------------|
 | IP Address  | 10.30.30.50   |
 | Subnet Mask | 255.255.255.0 |
 | Gateway     | 10.30.30.1    |
@@ -181,6 +185,7 @@ If a future exercise changes or damages the VM configuration, the machine can be
 # Lab Verification
 
 | Test                       | Command                        | Expected Result                 |
+|----------------------------|--------------------------------|---------------------------------|
 | Check IP address           | `ip a`                         | Correct Kali IP displayed       |
 | Test Gateway               | 'ping 10.30.30.1               | Successful replies              |
 | Test Internet Connectivity | `ping 8.8.8.8`                 | Successful replies              |
