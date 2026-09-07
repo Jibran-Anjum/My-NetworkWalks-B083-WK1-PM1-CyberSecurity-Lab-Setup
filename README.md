@@ -95,7 +95,7 @@ It can be used for activities like;
 
 And since I'm using *Debian Linux* so the command that I used to install it is the following;
 
-```
+```bash
 sudo apt install p7zip-full
 ```
 
@@ -109,12 +109,195 @@ I installed VirtualBox as the hypervisor.
 
 ---
 
+## 3rd Step -> Create the NAT Network
+
 I created a NAT network that was created in VirtualBox.
 
-Configuration:
-NetworkName: NatNetwork
-IPv4 Prefix: 10.30.30.0/24
-DHCP:        Enabled
-IPv6:        Disabled
+**Configuration:**
+
+| NetworkName: | NatNetwork    |
+| IPv4 Prefix: | 10.30.30.0/24 |
+| DHCP:        | Enabled       |
+| IPv6:        | Disabled      |
 
 ![](./ConfgureNetworkToNATNetwork.png)
+
+A **NAT Network** was selected because the multiple virtual machines connected to the same NAT Network can communicate with one another while also having outbound network connectivity.
+
+This will allow future attacker and target VMs to communicate within the lab.
+
+---
+
+## 4th Step -> Import Kali Linux
+
+The Kali Linux virtual machine was downloaded from the official Kali Linux website and imported into VirtualBox.
+
+The VM network adapter was configured as follows;
+
+| Adapter      | 1                                   |
+| Attached to  | NAT Network                         |
+| Network      | NATNetwork                          |
+| Adapter Type | Intel PRO/1000 MT Desktop (82540EM) |
+
+The VM was allocated;
+
+| RAM | 2048MB |
+
+![](./KaliLinux.png)
+
+---
+
+## 5th Step -> Configure the Kali Linux Network
+
+The Kali Linux network configuration was checked and configured with a consistent IPv4 address.
+
+The configuration;
+
+| IP Address  | 10.30.30.50   |
+| Subnet Mask | 255.255.255.0 |
+| Gateway     | 10.30.30.1    |
+| Primary DNS | 8.8.8.8       |
+
+A consistent IP address makes it easier to document the lab and reference the Kali machine in future exercises.
+
+![](./KaliNetworkSettingsStuff.png)
+
+---
+
+## 6th Step -> Create a Clean VM Snapshot
+
+After completing the initial configuration, a VirtualBox snapshot was created.
+
+![](./Snapshot.png)
+
+The snapshot represents the clean baseline of the laboratory.
+
+If a future exercise changes or damages the VM configuration, the machine can be restored to this baseline.
+
+---
+
+# Lab Verification
+
+| Test                       | Command                        | Expected Result                 |
+| Check IP address           | `ip a`                         | Correct Kali IP displayed       |
+| Test Gateway               | 'ping 10.30.30.1               | Successful replies              |
+| Test Internet Connectivity | `ping 8.8.8.8`                 | Successful replies              |
+| Test DNS resolution        | `nslookup networkwalks.com     | Domain resolves                 |
+| Verify Nmap                | `nmap --version`               | Nmap version displayed          |
+| Verify snapshot            | Restore snapshot and run `ip a | Baseline configuration restored |
+
+---
+
+# Problems Encountered & their Solutions
+
+The problems that I encountered were mainly because that I needed to create **NAT Network** on my laptop since I was on linux. Due to for some reason there wasn't any option to choose in the Network dropdown the showed **NAT Network**.
+
+Also I was using KVM setup before, and for this lab I needed to setup VirtualBox, so that also gave me a headache.
+
+The following phases the problems encountered and their solutions much better;
+
+## Troubleshooting & Issues Encountered
+
+### Topic 1: Host System Driver & Hypervisor Collisions
+When setting up VirtualBox on the Debian host, two major system-level blockages prevented virtual machines from starting. 
+
+#### Issue A: Missing Kernel Modules (`vboxdrv`)
+* **Symptom:** VirtualBox threw an error stating that the `vboxdrv` kernel module was not loaded for the current kernel (`6.12.107+deb13-amd64`).
+* **Solution:** Installed the necessary compilation tools and kernel headers, then manually forced VirtualBox to build the missing drivers:
+  ```bash
+  sudo apt update && sudo apt install -y build-essential dkms linux-headers-\$(uname -r)
+  sudo /sbin/vboxconfig
+  ```
+
+#### Issue B: KVM Hypervisor Exclusive Access Conflict (`VERR_VMX_IN_VMX_ROOT_MODE`)
+* **Symptom:** VirtualBox failed to launch the VM because Debian's default KVM virtualization module was occupying the CPU's VT-x extensions.
+* **Solution:** Permanently blacklisted the KVM modules at the system level, regenerated the boot image (`initramfs`), and rebooted the host machine:
+  ```bash
+  echo -e "blacklist kvm_intel\nblacklist kvm\ninstall kvm_intel /bin/false\ninstall kvm /bin/false" | sudo tee /etc/modprobe.d/blacklist-kvm.conf
+  sudo update-initramfs -u -k all
+  sudo reboot
+  ```
+
+### Topic 2: Network Subnet Collisions & Routing Failures
+Configuring the internal virtual machine network caused routing anomalies that cut off internet access.
+
+#### Issue A: Host Internet Outage due to Subnet Overlap
+* **Symptom:** Assigning the VirtualBox NAT Network to the standard `10.0.0.0/24` range caused the Kali VM to get internet, but completely broke the Debian host's internet connectivity. 
+* **Reason:** The physical home router was already using the `10.0.0.X` range. The matching subnets created a routing table conflict on the host.
+* **Solution:** Migrated VirtualBox to a completely isolated, non-overlapping private subnet (`10.30.30.0/24`) and refreshed the host's networking stack:
+  ```bash
+  vboxmanage natnetwork stop --netname MyNatNet
+  vboxmanage natnetwork modify --netname MyNatNet --network "10.30.30.0/24" --enable
+  vboxmanage dhcpserver modify --network=MyNatNet --server-ip=10.30.30.3 --lower-ip=10.30.30.4 --upper-ip=10.30.30.254 --netmask=255.255.255.0 --enable
+  vboxmanage natnetwork start --netname MyNatNet
+  sudo systemctl restart NetworkManager
+  ```
+
+#### Issue B: Missing Legacy Networking Tools in Kali Guest VM
+* **Symptom:** Commands like `eth0` and `dhclient` threw "device not found" errors inside the modern Kali Linux environment.
+* **Solution:** Modern Kali uses predictable network interface names (e.g., `enp0s3`) managed via `NetworkManager`. The connection was brought online by toggling the modern utility:
+  ```bash
+  sudo ip link set enp0s3 up
+  sudo nmcli networking off && sudo nmcli networking on
+  ```
+
+---
+
+# What I Learned
+
+The concepts and processes that I learned with this project are mentioned here;
+
+### 1. NAT vs NAT Network
+A standard NAT configuration and a NAT Network serve different purposes. A NAT Network allows multiple VMs connected to the same virtual network to communicate with one another while providing network address translation for external connectivity. This makes it useful for building a multi-machine cybersecurity laboratory.
+
+### 2. Virtual Machine Networking
+I learned how VirtualBox virtual network adapters connect virtual machines to different types of networks and how network configuration affects communication between machines.
+
+### 3. Static IP Configuration
+I learned how to configure and verify IPv4 addressing, subnet masks, gateways, and DNS settings in Kali Linux.
+
+### 4. VM Snapshots
+I learned that a clean snapshot should be created **before performing risky or experimental activities**. This provides a known-good recovery point for future cybersecurity exercises.
+
+### 5. Documentation
+I learned that documenting commands, configuration, screenshots, problems, and solutions is an important part of a professional cybersecurity project.
+
+### 6. Host Kernel Module Management
+I learned that VirtualBox relies on host-level kernel modules (`vboxdrv`) to interact directly with hardware. When utilizing a cutting-edge Linux kernel, these modules must be explicitly compiled alongside matching kernel headers and developer tools using utilities like **DKMS** to ensure stability across future system updates.
+
+### 7. Hypervisor Coexistence and Hardware Lockout
+I learned that hypervisors require exclusive access to CPU hardware virtualization extensions (Intel VT-x or AMD-V). Running multiple virtualization platforms simultaneously—such as VirtualBox alongside native Linux **KVM** services—causes structural system collisions (`VERR_VMX_IN_VMX_ROOT_MODE`), requiring the administrative blacklisting of conflicting modules.
+
+### 8. Network Subnet Collision and Routing Topology
+I learned that virtual networks must exist on completely isolated subnets relative to the physical host's environment. Overlapping a virtual network range (like `10.0.0.0/24`) with a home router's physical pool creates severe **routing architecture conflicts**, resulting in total internet drops on the host machine.
+
+### 9. Modern Linux Network Management
+I learned that modern Linux distributions have deprecated legacy tools like `eth0` and `dhclient`. Current operating systems rely on predictable network interface naming conventions (such as `enp0s3`) and manage dynamic IP negotiation exclusively through modern daemons like **NetworkManager** via the `nmcli` command line.
+
+---
+
+# Security & Ethical Use
+
+This laboratory is intended strictly for education purposes only.
+
+---
+
+# 🔗 Tools & Resources
+
+- **7-Zip:** [https://7-zip.org/download.html](https://7-zip.org/download.html)
+- **VirtualBox:** [https://virtualbox.org/wiki/Downloads](https://virtualbox.org/wiki/Downloads)
+- **Kali Linux:** [https://kali.org/get-kali](https://kali.org/get-kali)
+
+---
+
+# Author
+
+**Jibran Anjum Chughtai**
+
+Linkedin: [https://www.linkedin.com/in/jibran-anjum-chughtai-905a47256/](https://www.linkedin.com/in/jibran-anjum-chughtai-905a47256/)
+
+---
+
+## Project Information
+
+**Program Name:** Cybersecurity at Networkwalks | **Week:** 01 | **Project:** Cybersecurity & Pentesting Lab Setup | **Repository:** GitHub
